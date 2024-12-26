@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "hackChromePassword"
+version = "0.1.0"
+description = ""
+authors = ["Jiahao Luo <luoshitou9@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.10,<3.14"
+pycryptodome = "^3.21.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
