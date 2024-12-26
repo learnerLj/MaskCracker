@@ -1,4 +1,10 @@
+"""
+Script to decrypt Chrome's stored passwords from Login Data databases.
+This script is specifically for older Chrome versions that use AES-128-CBC encryption with a fixed IV.
+"""
+
 import os
+import sys
 import glob
 import sqlite3
 import hashlib
