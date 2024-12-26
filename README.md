@@ -1,8 +1,9 @@
 <div align="center">
 <img src="logo.png" alt="hack-browser-data logo" width="440px" />
 </div>
-
-# hackChromePassword
+<p align="left">
+  <a href="./README_en.md">English Version Here</a> 
+</p>
 
 这是一个用于解密存储在 Chrome 登录数据数据库中的密码的 Python 脚本，支持 MAC 和 windows。基本原理是从 chrome 本地 sqlite 数据库，读取 uri, username, password，并且模拟 chrome 的加密算法，使用 python 解密 password。
 
@@ -41,3 +42,6 @@ poetry run python main.py
 poetry shell
 python main.py
 ```
+
+> 个人博客：[blog-blockchain.xyz](https://blog-blockchain.xyz/)
+> 我会分享如何实现，以及如何阅读 chrome 代码找到对应逻辑解密。后续更进一步，会分享浏览器钱包插件如何被一键式 hack。
