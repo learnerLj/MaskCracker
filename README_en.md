@@ -50,4 +50,4 @@ python main.py
 
 This tool is intended for security research purposes only. The user assumes full responsibility for any legal consequences that may arise from the use of this tool. The author is not liable for any damages or legal issues resulting from its usage.
 
-> blog：http://blog-blockchain.xyz/
+> blog：[blog-blockchain.xyz](https://blog-blockchain.xyz/)
