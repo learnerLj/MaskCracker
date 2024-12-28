@@ -1,1 +1,88 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.pytest_cache
+.env
+.Python
+env/
+venv/
 .venv
+ENV/
+env.bak/
+venv.bak/
+*.egg
+*.egg-info/
+dist/
+build/
+*.whl
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+
+# Pytest
+.cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# PyCharm
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# VSCode
+.vscode/
+
+# MacOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Thumbnails
+._*
+
+# macOS specific file attributes
+.Spotlight-V100
+.Trashes
+.metadata_never_index
+.fseventsd/
+
+# Logs and databases
+*.log
+*.sqlite3
+
+# Virtual machine files
+*.vagrant/
+*.vbox/
+*.vbox-prev
+
+# Temporary files and directories
+*.tmp
+*.swp
+*.swo
+*.bak
+*.orig
+*.save
+
+# Editor backups
+*.~*
+*.kate-swp
+*~.nib
+

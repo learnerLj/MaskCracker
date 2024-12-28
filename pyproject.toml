@@ -10,6 +10,8 @@ package-mode = false
 python = ">=3.10,<3.14"
 pycryptodome = "^3.21.0"
 pywin32 = { version = "308", platform = "win32" }
+termcolor = "^2.5.0"
+pytest = "^8.3.4"
 
 
 [build-system]

