@@ -28,12 +28,36 @@ poetry install
 
 由于 hashcat 在处理metamask的模块已经过时，可以使用我 fork 的 [hashcat](https://github.com/learnerLj/hashcat)。读者可以在 [Releases](https://github.com/learnerLj/hashcat/releases/tag/fix-version) 中下载修复的版本 `hashcat-fix-metamask.tar.gz`，里面包含macos的 `hashcat` 和交叉编译用于windows的 `hashcat.exe`。读者也可参考 `BUILD*.md` 自行编译。
 
+解压到仓库根目录。
+如果是macos，直接运行 ` ./hashcat/hashcat -b`，如果正常进行 benchmark，说明可以正常使用。
+如果是windows，先进入 `hashcat` 目录，运行 `hashcat.exe -b`，如果正常进行 benchmark，说明可以正常使用。
+windows上你可能被提示你的显卡需要安装或者更新驱动。
+```bash
+
 ## 使用方法
 
+> ‼️‼️🚨🚨 作为安全测试工具，建议使用没有资产的钱包测试。并且建议有能力的读者，检查代码后自行编译。
+> 本软件无任何联网功能。
+> 
+> 请勿在工作电脑上运行，可能会被监控，造成误会。尤其是 macOS 通过 security 命令从 keychain 获取密码是高危行为。
+
 进入虚拟环境
+
 ```bash
 poetry shell # 进入虚拟环境
 python src/main.py
+```
+
+设置环境变量 `PYTHONPATH`，指向项目根目录。
+```shell
+# 对于 macOS 和 Linux
+export PYTHONPATH=$PWD
+
+# 对于 Windows CMD
+set PYTHONPATH=%cd%
+
+# 对于 Windows PowerShell
+$env:PYTHONPATH=$PWD
 ```
 
 ### 常见用法
@@ -53,11 +77,12 @@ python src/main.py decrypt-metamask 12345678
 **1. 生成字典**：
 
 ‼️‼️🚨🚨 **字典目录下的原始字典将会被删除！所以请保留副本，再复制到 `output/dictionary`**
+
+以下命令都建议在仓库根目录下运行。
 ```bash
 # --chrome-pass 可省略，若添加表示额外使用chrome密码生成字典，密码文件下载见下文密码库
 python src/main.py generate-dict --chrome-pass output/dictionary
 ```
-
 
 字典文件夹下的 `need_to_split` 文件夹，它下面的所有密码都是需要拆分的，格式类似`用户名:密码`、 `用户名;密码`、 `hash:密码`、`hash;密码`。这有助于使用已有的彩虹表或者泄漏的密码库。其余明文密码直接放在 `dictionary` 的除了 `need_to_split` 下的任何其他位置即可。下面表示处理后的变化，会过滤出密码库中所有符合metamask的密码。
 
@@ -75,6 +100,41 @@ dictionary
 ```
 > 每个plain_pass最大512MB。
 > 考虑到密码去重复即使用布隆过滤器，资源占用也很大，所以不会自动去重复。可以使用redis等数据库进行去重复。
+
+**2. 准备 hashcat 暴力破解**
+
+它将生成一个 hashcat 目标文件，格式为 `$metamask${salt}${iterations}${iv}${cypher}`，用于 hashcat 破解。
+第二个参数是字典文件夹。随后会在仓库根目录生成 `run_bashcat.sh` 和 `run_hashcat.bat`，用于运行 hashcat。
+
+```bash
+python src/main.py prepare-hashcat output/hashcat-target.txt output/dictionary
+```
+
+**3. 使用 hashcat 破解**
+
+```bash
+# 对于macos
+bash run_hashcat.sh
+
+# 对于windows
+.\run_hashcat.bat
+```
+
+**4. 查看结果**
+上一步会运行，直到找到结果。
+出现如下提示，按s会显示当前状态，按q退出。
+```
+[s]tatus [p]ause [b]ypass [c]heckpoint [f]inish [q]uit => 
+# 按s后打印当前状态，比较重要的有
+Status：当前状态，Running 表示正在运行，Exhausted 表示已经尝试完所有密码，Cracked 表示找到密码。
+Time.Estimated：预计完成时间
+Guess.Base：当前使用的字典
+Speed.#2：当前速度，每秒尝试密码数
+Progress：当前进度，尝试过的密码数
+```
+
+如果找到了密码，会显示 `Status: Cracked`，并且在前2行末尾会显示密码。例如`sH3TV5Q0G0rEQ==:12345678`，
+表示`12345678` 是密码。
 
 ## 密码库
 
@@ -103,8 +163,25 @@ dictionary
 
 
 ## 常见问题
+### No module named 'src'
+请确保已经进入虚拟环境 `poetry shell`，并且在项目根目录下运行，而不是在其他目录下。
+环境变量 `PYTHONPATH` 也需要指向项目根目录。
+
+```shell
+# 对于 macOS 和 Linux
+export PYTHONPATH=$PWD
+
+# 对于 Windows CMD
+set PYTHONPATH=%cd%
+
+# 对于 Windows PowerShell
+$env:PYTHONPATH=$PWD
+```
+
 ### 找不到依赖裤
+问题类似于 `ModuleNotFoundError: No module named 'xxx'`，解决方法是
 重新运行 `poetry install` 并且重新进入虚拟环境 `poetry shell`
+
 ### 无法找到 metamask vault
 由于通过 chrome 本地存储的 metamask 记录解密，而不是根据完全加密后的 `.ldb` 解密，又无法预测日志删除时间，所以如果钱包长期未打开，可能会删除相关记录。
 

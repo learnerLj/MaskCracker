@@ -12,67 +12,6 @@ import shutil
 import tempfile
 
 
-def check_vault_fileds(vault_dict: dict):
-    """
-    Validates the presence of required fields in the vault dictionary and decodes the necessary values.
-    Args:
-        vault_dict (dict): A dictionary containing the vault data with the following keys:
-            - "data": Base64 encoded encrypted data.
-            - "iv": Base64 encoded initialization vector.
-            - "salt": Base64 encoded salt.
-            - "keyMetadata": A dictionary containing key metadata with the following structure:
-                - "params": A dictionary containing parameters with the following key:
-                    - "iterations": The number of iterations for key derivation.
-    Returns:
-        tuple: A tuple containing the decoded encrypted data, initialization vector, salt, and iterations.
-    Raises:
-        ValueError: If any of the required fields are missing from the vault dictionary.
-    """
-
-    if (
-        "data" not in vault_dict
-        or "iv" not in vault_dict
-        or "salt" not in vault_dict
-        or "keyMetadata" not in vault_dict
-        or "params" not in vault_dict["keyMetadata"]
-        or "iterations" not in vault_dict["keyMetadata"]["params"]
-    ):
-        raise ValueError("Missing required fields")
-
-    encrypted_data = b64decode(vault_dict["data"])
-    iv = b64decode(vault_dict["iv"])
-    salt = b64decode(vault_dict["salt"])
-    iterations = vault_dict["keyMetadata"]["params"]["iterations"]
-    return encrypted_data, iv, salt, iterations
-
-
-def decrypt_metamask_vault(vault_dict: dict, password: str) -> list[dict]:
-    encrypted_data, iv, salt, iterations = check_vault_fileds(vault_dict)
-
-    # 创建密钥
-    key = PBKDF2(password, salt, dkLen=32, count=iterations, hmac_hash_module=SHA256)
-
-    # tag 与数据一起传递，且位于数据末尾的16字节
-    tag = encrypted_data[-16:]
-    encrypted_data = encrypted_data[:-16]
-
-    # 解密数据
-    cipher = AES.new(key, AES.MODE_GCM, iv)
-    try:
-        decrypted_data = cipher.decrypt_and_verify(encrypted_data, tag)
-    except Exception as e:
-        raise (f"Decryption failed: {str(e)}")
-
-    decrypted_list = json.loads(decrypted_data)
-    for item in decrypted_list:
-        if "data" in item and "mnemonic" in item["data"]:
-            # 将 ASCII 码值列表转换为字符，并组合成字符串
-            mnemonic_str = "".join(chr(code) for code in item["data"]["mnemonic"])
-            item["data"]["mnemonic"] = mnemonic_str
-
-    return decrypted_list
-
-
 def get_metamask_vault_path():
     paths = []
     if platform.system() == "Darwin":
@@ -95,7 +34,7 @@ def get_metamask_vault_path():
         return paths[0]
 
 
-def extract_vault(data: str):
+def parse_vault_data(data: str):
 
     # 尝试 1: 尝试解析为 JSON
     try:
@@ -166,6 +105,86 @@ def extract_vault(data: str):
     return vaults[0]
 
 
+def check_vault_fileds(vault_dict: dict):
+    """
+    Validates the presence of required fields in the vault dictionary and decodes the necessary values.
+    Args:
+        vault_dict (dict): A dictionary containing the vault data with the following keys:
+            - "data": Base64 encoded encrypted data.
+            - "iv": Base64 encoded initialization vector.
+            - "salt": Base64 encoded salt.
+            - "keyMetadata": A dictionary containing key metadata with the following structure:
+                - "params": A dictionary containing parameters with the following key:
+                    - "iterations": The number of iterations for key derivation.
+    Returns:
+        tuple: A tuple containing the decoded encrypted data, initialization vector, salt, and iterations.
+    Raises:
+        ValueError: If any of the required fields are missing from the vault dictionary.
+    """
+
+    if (
+        "data" not in vault_dict
+        or "iv" not in vault_dict
+        or "salt" not in vault_dict
+        or "keyMetadata" not in vault_dict
+        or "params" not in vault_dict["keyMetadata"]
+        or "iterations" not in vault_dict["keyMetadata"]["params"]
+    ):
+        raise ValueError("Missing required fields")
+
+    encrypted_data = b64decode(vault_dict["data"])
+    iv = b64decode(vault_dict["iv"])
+    salt = b64decode(vault_dict["salt"])
+    iterations = vault_dict["keyMetadata"]["params"]["iterations"]
+    return encrypted_data, iv, salt, iterations
+
+
+def decrypt_metamask_vault(vault_dict: dict, password: str) -> list[dict]:
+    encrypted_data, iv, salt, iterations = check_vault_fileds(vault_dict)
+
+    # 创建密钥
+    key = PBKDF2(password, salt, dkLen=32, count=iterations, hmac_hash_module=SHA256)
+
+    # tag 与数据一起传递，且位于数据末尾的16字节
+    tag = encrypted_data[-16:]
+    encrypted_data = encrypted_data[:-16]
+
+    # 解密数据
+    cipher = AES.new(key, AES.MODE_GCM, iv)
+    try:
+        decrypted_data = cipher.decrypt_and_verify(encrypted_data, tag)
+    except Exception as e:
+        raise (f"Decryption failed: {str(e)}")
+
+    decrypted_list = json.loads(decrypted_data)
+    for item in decrypted_list:
+        if "data" in item and "mnemonic" in item["data"]:
+            # 将 ASCII 码值列表转换为字符，并组合成字符串
+            mnemonic_str = "".join(chr(code) for code in item["data"]["mnemonic"])
+            item["data"]["mnemonic"] = mnemonic_str
+
+    return decrypted_list
+
+
+def extract_metamask_vault() -> dict:
+    p = get_metamask_vault_path()
+    temp_dir = tempfile.mkdtemp()
+    temp_file_path = os.path.join(temp_dir, os.path.basename(p))
+    shutil.copy(p, temp_file_path)
+
+    with open(temp_file_path, "rb") as file:
+        data = file.read().decode("utf-8", errors="ignore")
+    shutil.rmtree(temp_dir)
+    vault = parse_vault_data(data)
+    return vault
+
+
+def hack_metamask(password: str) -> list[dict]:
+    vault = extract_metamask_vault()
+    d = decrypt_metamask_vault(vault, password)
+    return d
+
+
 def beauty_print_metamask(data: list[dict]) -> None:
     print("=" * 50)
     print(colored("Metamask Wallet Information", "blue", attrs=["bold", "underline"]))
@@ -191,21 +210,6 @@ def beauty_print_metamask(data: list[dict]) -> None:
 
     print(colored("End of List", "red", attrs=["bold", "underline"]))
     print("=" * 50)
-
-
-def hack_metamask(password: str) -> list[dict]:
-    p = get_metamask_vault_path()
-    temp_dir = tempfile.mkdtemp()
-    temp_file_path = os.path.join(temp_dir, os.path.basename(p))
-    shutil.copy(p, temp_file_path)
-
-    p = temp_file_path
-    with open(p, "rb") as file:
-        data = file.read().decode("utf-8", errors="ignore")
-    vault = extract_vault(data)
-    shutil.rmtree(temp_dir)
-    d = decrypt_metamask_vault(vault, password)
-    return d
 
 
 if __name__ == "__main__":

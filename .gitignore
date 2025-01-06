@@ -1,4 +1,6 @@
 output/*
+hashcat
+run_hashcat*
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
