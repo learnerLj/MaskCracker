@@ -12,6 +12,7 @@ pycryptodome = "^3.21.0"
 pywin32 = { version = "308", platform = "win32" }
 termcolor = "^2.5.0"
 pytest = "^8.3.4"
+tqdm = "^4.67.1"
 
 
 [build-system]
