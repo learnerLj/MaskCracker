@@ -1,25 +1,36 @@
-import os
-import re
-import subprocess
-from hack_metamask import (
-    beauty_print_metamask,
-    check_vault_fileds,
-    decrypt_metamask_vault,
+import logging
+from pathlib import Path
+
+from hack_metamask import check_vault_fileds
+
+logging.basicConfig(
+    format="%(levelname)s - %(filename)s:%(lineno)d - %(message)s", level=logging.INFO
 )
 
 
-def generate_metamask_hash(vault_dict: dict, hashfile_path: str) -> str:
-    check_vault_fileds(vault_dict)
+def generate_metamask_hash(vault_dict: dict, hashfile_path: Path) -> str:
+    try:
+        check_vault_fileds(vault_dict)
 
-    salt = vault_dict["salt"]  # Base64 编码
-    iv = vault_dict["iv"]  # Base64 编码
-    data = vault_dict["data"]  # Base64 编码
-    iterations = vault_dict["keyMetadata"]["params"]["iterations"]  # 迭代次数
+        salt = vault_dict["salt"]
+        iv = vault_dict["iv"]
+        data = vault_dict["data"]
+        iterations = vault_dict["keyMetadata"]["params"]["iterations"]
 
-    h = f"$metamask${salt}${iterations}${iv}${data}"
-    with open(hashfile_path, "w") as file:
-        file.write(h)
-    return hashfile_path
+        hash_string = f"$metamask${salt}${iterations}${iv}${data}"
+        logging.info("Generated hash string successfully.")
+
+        hashfile_path.parent.mkdir(parents=True, exist_ok=True)
+        hashfile_path.write_text(hash_string)
+        logging.info(f"Hash saved to: {hashfile_path}")
+        return hash_string
+    except KeyError as e:
+        logging.error(f"Missing required key in vault_dict: {e}")
+        raise ValueError(f"Vault dictionary missing key: {e}")
+
+    except Exception as e:
+        logging.error(f"An unexpected error occurred: {e}")
+        raise RuntimeError(f"Failed to generate metamask hash: {e}")
 
 
 # 示例用法
@@ -32,7 +43,7 @@ if __name__ == "__main__":
         "keyMetadata": {"algorithm": "PBKDF2", "params": {"iterations": 600000}},
     }
 
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    hashfile_path = os.path.join(current_dir, "../dictionary/metamask_hash.txt")
-    word_dict = os.path.join(current_dir, "../dictionary/rockyou.txt")
+    current_dir = Path(__file__).resolve().parent
+    hashfile_path = current_dir / "../dictionary/metamask_hash.txt"
+    word_dict = current_dir / "../dictionary/rockyou.txt"
     generate_metamask_hash(vault_example, hashfile_path)

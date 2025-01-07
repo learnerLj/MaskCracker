@@ -1,8 +1,8 @@
 import json
-from src.hack_metamask import decrypt_metamask_vault
-
 
 import pytest
+
+from src.hack_metamask import decrypt_metamask_vault
 
 
 @pytest.mark.parametrize(

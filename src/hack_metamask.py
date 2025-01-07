@@ -1,48 +1,48 @@
 import glob
-import os
-import platform
-from Crypto.Cipher import AES
-from Crypto.Protocol.KDF import PBKDF2
-from Crypto.Hash import SHA256
-from base64 import b64decode
 import json
+import platform
 import re
-from termcolor import colored
 import shutil
 import tempfile
+from base64 import b64decode
+from pathlib import Path
+
+from Crypto.Cipher import AES
+from Crypto.Hash import SHA256
+from Crypto.Protocol.KDF import PBKDF2
+from termcolor import colored
 
 
-def get_metamask_vault_path():
-    paths = []
+def get_metamask_vault_path() -> Path:
     if platform.system() == "Darwin":
-        p = os.path.expanduser(
-            "~/Library/Application Support/Google/Chrome/Default/Local Extension Settings/nkbihfbeogaeaoehlefnkodbefgpgknn"
+        base_path = (
+            Path.home()
+            / "Library/Application Support/Google/Chrome/Default/Local Extension Settings/nkbihfbeogaeaoehlefnkodbefgpgknn"
         )
-        paths = glob.glob(os.path.join(p, "[0-9]*.log"))
     elif platform.system() == "Windows":
-        user_profile = os.environ.get("USERPROFILE")
-        if user_profile:
-            p = os.path.join(
-                user_profile,
-                "AppData\\Local\\Google\\Chrome\\User Data\\Default\\Local Extension Settings\\nkbihfbeogaeaoehlefnkodbefgpgknn",
-            )
-            paths.extend(glob.glob(os.path.join(p, "[0-9]*.log")))
-
-    if len(paths) != 1:
-        raise Exception("Multiple or no MetaMask vault paths found.")
+        user_profile = Path.home()
+        base_path = (
+            user_profile
+            / "AppData/Local/Google/Chrome/User Data/Default/Local Extension Settings/nkbihfbeogaeaoehlefnkodbefgpgknn"
+        )
     else:
-        return paths[0]
+        raise EnvironmentError("Unsupported OS for locating MetaMask vault.")
+
+    vault_files = glob.glob(str(base_path / "[0-9]*.log"))
+    if len(vault_files) != 1:
+        raise FileNotFoundError("Multiple or no MetaMask vault paths found.")
+    return Path(vault_files[0])
 
 
 def parse_vault_data(data: str):
 
-    # 尝试 1: 尝试解析为 JSON
+    # Attempt 1: Try parsing as JSON
     try:
         return json.loads(data)
     except json.JSONDecodeError:
-        pass  # 如果不是有效 JSON，继续下一步
+        pass
 
-    # 尝试 2: Pre-v3 cleartext
+    # Attempt 2: Pre-v3 cleartext
     pre_v3_matches = re.search(r'{"wallet-seed":"([^"}]*)"}', data)
     if pre_v3_matches:
         mnemonic = pre_v3_matches.group(1).replace("\\n", "")
@@ -50,13 +50,13 @@ def parse_vault_data(data: str):
         vault = json.loads(json.loads(vault_matches.group(1))) if vault_matches else {}
         return {"data": {"mnemonic": mnemonic, **vault}}
 
-    # 尝试 3: Chromium 000003.log 文件 (Linux)
+    # Attempt 3: Chromium 000003.log file (Linux)
     linux_matches = re.search(r'"KeyringController":\{"vault":"({[^{}]*})"', data)
     if linux_matches:
         vault_body = linux_matches.group(1)
         return json.loads(vault_body)
 
-    # 尝试 4: Chromium 000006.log 文件 (MacOS)
+    # Attempt 4: Chromium 000006.log file (MacOS)
     macos_matches = re.search(r'KeyringController":(\{"vault":".*?=\\"\}"\})', data)
     if macos_matches:
         keyring_fragment = macos_matches.group(1)
@@ -80,7 +80,7 @@ def parse_vault_data(data: str):
         except Exception:
             pass
 
-    # 尝试 5: Chromium 000005.ldb 文件 (Windows)
+    # Attempt 5: Chromium 000005.ldb file (Windows)
     windows_matches = re.finditer(r'Keyring[0-9][^\}]*({[^\{\}]*\\"\})', data)
     vaults = []
     for match in windows_matches:
@@ -101,55 +101,33 @@ def parse_vault_data(data: str):
     if not vaults:
         raise Exception("No vaults found or metamask is closed")
     if len(vaults) > 1:
-        print("Found multiple vaults!", vaults)
+        raise Exception("Found multiple vaults!", vaults)
     return vaults[0]
 
 
-def check_vault_fileds(vault_dict: dict):
-    """
-    Validates the presence of required fields in the vault dictionary and decodes the necessary values.
-    Args:
-        vault_dict (dict): A dictionary containing the vault data with the following keys:
-            - "data": Base64 encoded encrypted data.
-            - "iv": Base64 encoded initialization vector.
-            - "salt": Base64 encoded salt.
-            - "keyMetadata": A dictionary containing key metadata with the following structure:
-                - "params": A dictionary containing parameters with the following key:
-                    - "iterations": The number of iterations for key derivation.
-    Returns:
-        tuple: A tuple containing the decoded encrypted data, initialization vector, salt, and iterations.
-    Raises:
-        ValueError: If any of the required fields are missing from the vault dictionary.
-    """
+def check_vault_fileds(vault: dict) -> tuple:
+    required_keys = ["data", "iv", "salt", "keyMetadata"]
+    for key in required_keys:
+        if key not in vault:
+            raise KeyError(f"Missing required field: {key}")
 
-    if (
-        "data" not in vault_dict
-        or "iv" not in vault_dict
-        or "salt" not in vault_dict
-        or "keyMetadata" not in vault_dict
-        or "params" not in vault_dict["keyMetadata"]
-        or "iterations" not in vault_dict["keyMetadata"]["params"]
-    ):
-        raise ValueError("Missing required fields")
+    encrypted_data = b64decode(vault["data"])
+    iv = b64decode(vault["iv"])
+    salt = b64decode(vault["salt"])
+    iterations = vault["keyMetadata"]["params"]["iterations"]
 
-    encrypted_data = b64decode(vault_dict["data"])
-    iv = b64decode(vault_dict["iv"])
-    salt = b64decode(vault_dict["salt"])
-    iterations = vault_dict["keyMetadata"]["params"]["iterations"]
     return encrypted_data, iv, salt, iterations
 
 
 def decrypt_metamask_vault(vault_dict: dict, password: str) -> list[dict]:
     encrypted_data, iv, salt, iterations = check_vault_fileds(vault_dict)
 
-    # 创建密钥
     key = PBKDF2(password, salt, dkLen=32, count=iterations, hmac_hash_module=SHA256)
 
-    # tag 与数据一起传递，且位于数据末尾的16字节
+    # The tag is passed along with the data and is the last 16 bytes of the data
     tag = encrypted_data[-16:]
     encrypted_data = encrypted_data[:-16]
 
-    # 解密数据
     cipher = AES.new(key, AES.MODE_GCM, iv)
     try:
         decrypted_data = cipher.decrypt_and_verify(encrypted_data, tag)
@@ -159,7 +137,7 @@ def decrypt_metamask_vault(vault_dict: dict, password: str) -> list[dict]:
     decrypted_list = json.loads(decrypted_data)
     for item in decrypted_list:
         if "data" in item and "mnemonic" in item["data"]:
-            # 将 ASCII 码值列表转换为字符，并组合成字符串
+            # Convert ASCII code list to characters and combine into a string
             mnemonic_str = "".join(chr(code) for code in item["data"]["mnemonic"])
             item["data"]["mnemonic"] = mnemonic_str
 
@@ -167,16 +145,14 @@ def decrypt_metamask_vault(vault_dict: dict, password: str) -> list[dict]:
 
 
 def extract_metamask_vault() -> dict:
-    p = get_metamask_vault_path()
-    temp_dir = tempfile.mkdtemp()
-    temp_file_path = os.path.join(temp_dir, os.path.basename(p))
-    shutil.copy(p, temp_file_path)
+    vault_path = get_metamask_vault_path()
 
-    with open(temp_file_path, "rb") as file:
-        data = file.read().decode("utf-8", errors="ignore")
-    shutil.rmtree(temp_dir)
-    vault = parse_vault_data(data)
-    return vault
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_file = Path(temp_dir) / vault_path.name
+        shutil.copy(vault_path, temp_file)
+        data = temp_file.read_text(encoding="utf-8", errors="ignore")
+
+    return parse_vault_data(data)
 
 
 def hack_metamask(password: str) -> list[dict]:
@@ -194,12 +170,12 @@ def beauty_print_metamask(data: list[dict]) -> None:
         print(colored(f"[{i}]", "yellow", attrs=["bold"]))
         for key, value in wallet.items():
             if key == "mnemonic":
-                # 高亮 'mnemonic' 字段的值
+                # Highlight the value of the 'mnemonic' field
                 print(
                     f"  {key.capitalize()}: {colored(value, 'green', attrs=['bold'])}"
                 )
             else:
-                # 使用 json.dumps 格式化其他字段
+                # Format other fields
                 formatted_value = (
                     json.dumps(value, indent=4)
                     if isinstance(value, (dict, list))
