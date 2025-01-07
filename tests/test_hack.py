@@ -1,8 +1,8 @@
 import json
-from src.hack_metamask import decrypt_metamask_vault
-
 
 import pytest
+
+from src.hack_metamask import decrypt_metamask_vault
 
 
 @pytest.mark.parametrize(
@@ -24,7 +24,3 @@ def test_metamask_vault_decryption(vault, password):
     )
     assert found, "Mnemonic phrase decryption failed"
     print(decrypted)
-
-
-# decrypted_data = decrypt_metamask_vault(v, password)
-# print(decrypted_data)  # 假设原始数据是utf-8编码的字符串

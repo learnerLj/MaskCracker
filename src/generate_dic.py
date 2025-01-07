@@ -1,14 +1,19 @@
+import logging
 import os
-from concurrent.futures import ThreadPoolExecutor, as_completed
 import shutil
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
+
 from tqdm import tqdm
+
 from src.hack_chrome_password import hack_chrome_login_info
-from src.utils import get_files_in_dir, extract_file, is_subpath
+from src.utils import extract_file, get_files_in_dir, is_subpath
 
 
-def extract_files_in_directory(directory: str, is_delete: bool = False):
-    if not os.path.isdir(directory):
-        ValueError(f"Error: The path {directory} is not a valid directory.")
+def extract_files_in_directory(directory: Path, is_delete: bool = False):
+    if not directory.is_dir():
+        raise ValueError(f"Error: The path {directory} is not a valid directory.")
+
     supported_suffixes = [
         ".tar.gz",
         ".tgz",
@@ -31,11 +36,11 @@ def extract_files_in_directory(directory: str, is_delete: bool = False):
             as_completed(futures), total=len(futures), desc="Extracting files"
         ):
             try:
-                future.result()  # 确保捕获任务中的异常
+                future.result()
             except Exception as e:
-                print(f"An error occurred during task execution: {e}")
+                logging.error(f"An error occurred during task execution: {e}")
 
-    print("All compressed files have been processed\n")
+    logging.info("All compressed files have been processed")
 
 
 def split_pass(dir: str, is_delete: bool = False):
@@ -46,7 +51,7 @@ def split_pass(dir: str, is_delete: bool = False):
     :param is_delete: 是否删除原文件，默认为 False
     """
     if not os.path.isdir(dir):
-        print(f"no directory for password splitting: {dir}\n")
+        logging.info(f"no directory for password splitting: {dir}")
         return
 
     # Ignore files starting with "plain_pass_" as these are flattened
@@ -56,10 +61,10 @@ def split_pass(dir: str, is_delete: bool = False):
     )
 
     if not txt_files:
-        print("No txt files found for password splitting\n")
+        logging.info("No txt files found for password splitting")
         return
 
-    print(f"Found {len(txt_files)} txt files that need password splitting")
+    logging.info(f"Found {len(txt_files)} txt files that need password splitting")
 
     def split_line(line: str) -> str | None:
         line = line.strip()
@@ -82,8 +87,9 @@ def split_pass(dir: str, is_delete: bool = False):
             return None
         return password
 
-    def process_file(file_path: str):
-        output_file = ".".join(file_path.split(".")[:-1]) + "_only_pass.txt"
+    def process_file(file_path: Path):
+        # output_file = ".".join(file_path.split(".")[:-1]) + "_only_pass.txt"
+        output_file = file_path.with_name(file_path.stem + "_only_pass.txt")
         with open(file_path, "r", encoding="utf-8", errors="replace") as infile, open(
             output_file, "w", encoding="utf-8"
         ) as outfile:
@@ -93,7 +99,7 @@ def split_pass(dir: str, is_delete: bool = False):
                     continue
                 outfile.write(password + "\n")
         if is_delete:
-            os.remove(file_path)
+            file_path.unlink()
 
     # Display progress using tqdm, with default concurrency of min(32, os.cpu_count() + 4), no manual control needed
     with ThreadPoolExecutor() as executor:
@@ -107,9 +113,11 @@ def split_pass(dir: str, is_delete: bool = False):
             try:
                 future.result()
             except Exception as e:
-                print(f"Error occurred while separating passwords in file {file}: {e}")
+                logging.error(
+                    f"Error occurred while separating passwords in file {file}: {e}"
+                )
 
-    print("Password separation completed\n")
+    logging.info("Password separation completed")
 
 
 def chrome_pass_to_txt(dir: str):
@@ -142,7 +150,7 @@ def flatten_pass(dir: str, size: int = 512, is_delete: bool = False):
         output_file_index += 1
         buffer = []  # 清空缓冲区
         buffer_size = 0
-        print(f"Write complete: {output_file_path}")
+        logging.info(f"Write complete: {output_file_path}")
 
     # 检查目录下是否只有 plain_pass_*.txt 文件
     all_files = os.listdir(dir)
@@ -151,24 +159,24 @@ def flatten_pass(dir: str, size: int = 512, is_delete: bool = False):
         for f in all_files
         if not f.startswith(".")
     ):
-        print("only plain_pass_*.txt files exist, skip flatten")
+        logging.info("only plain_pass_*.txt files exist, skip flatten")
         return
     # 删除之前生成的合并文件
     files_delete = get_files_in_dir(dir, prefix="plain_pass_", suffix=".txt")
     for file in files_delete:
         os.remove(file)
 
-    print("Cleanup complete: All old plain_pass_*.txt files have been deleted")
+    logging.info("Cleanup complete: All old plain_pass_*.txt files have been deleted")
 
     # Retrieve all files that need to be processed
     files_to_process = get_files_in_dir(dir, suffix="only_pass.txt")
 
     # If there are no files to process, exit directly
     if not files_to_process:
-        print("No files found that need flattening.")
+        logging.info("No files found that need flattening.")
         return
 
-    print(f"Found {len(files_to_process)} files that need flattening")
+    logging.info(f"Found {len(files_to_process)} files that need flattening")
 
     # Use a progress bar to display the progress
     for file_path in tqdm(
@@ -193,35 +201,36 @@ def flatten_pass(dir: str, size: int = 512, is_delete: bool = False):
     if buffer:
         write_lines_to_file()
 
-    print("Flattening completed\n")
+    logging.info("Flattening completed")
 
 
-def generate_dict(directory: str, add_chrome_pass: bool = False):
+def generate_dict(directory: Path, add_chrome_pass: bool = False):
 
-    need_to_split = os.path.join(directory, "need_to_split")
+    need_to_split = directory / "need_to_split"
     if not os.path.isdir(need_to_split):
         need_to_split = ""
 
     if add_chrome_pass:
         chrome_pass_to_txt(directory)
 
-    # 首先解压目录中的所有压缩文件
+    # First, extract all compressed files in the directory
     extract_files_in_directory(directory, is_delete=True)
 
     txt_files = get_files_in_dir(
         directory, suffix=".txt", not_prefix="plain_pass_", not_suffix="only_pass.txt"
     )
 
-    if need_to_split:  # filter out files that need to be split
+    # rename the txt files that do not need to split
+    if need_to_split:
         txt_files = [file for file in txt_files if not is_subpath(file, need_to_split)]
     for file_name in txt_files:
-        new_name = file_name[:-4] + "_only_pass.txt"
-        os.rename(file_name, new_name)
+        new_name = file_name.with_name(file_name.stem + "_only_pass.txt")
+        file_name.rename(new_name)
 
-    # 然后处理需要分离密码的文件
+    # Then process the files that need password separation
     split_pass(need_to_split, is_delete=True)
 
-    # 只处理结尾only_pass.txt
+    # Only process files ending with only_pass.txt
     flatten_pass(directory, is_delete=True)
 
     for entry in os.scandir(directory):

@@ -1,14 +1,9 @@
 import argparse
-import os
+import logging
 from pathlib import Path
-from src.generate_dic import (
-    chrome_pass_to_txt,
-    extract_files_in_directory,
-    generate_dict,
-    split_pass,
-    flatten_pass,
-)
-from src.hack_chrome_password import hack_chrome_login_info, beauty_print_chrome
+
+from src.generate_dic import generate_dict
+from src.hack_chrome_password import beauty_print_chrome, hack_chrome_login_info
 from src.hack_metamask import (
     beauty_print_metamask,
     extract_metamask_vault,
@@ -17,85 +12,112 @@ from src.hack_metamask import (
 from src.hashcat import generate_metamask_hash
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="test your metamask's security if hacker invade your computer"
+def generate_dict_command(directory: Path, chrome_pass: bool) -> None:
+    # Execute the generate-dict sub-command
+    logging.info(
+        f"Generating dictionary in {directory}, chrome passwords included: {chrome_pass}"
     )
-    subparsers = parser.add_subparsers(dest="command", help="sub-command help")
+    generate_dict(directory, chrome_pass)
+
+
+def chrome_password_command() -> None:
+    # Execute the chrome-password sub-command
+    login_infos = hack_chrome_login_info()
+    beauty_print_chrome(login_infos)
+
+
+def decrypt_metamask_command(password: str) -> None:
+    # Execute the decrypt-metamask sub-command
+    decrypted_data = hack_metamask(password)
+    beauty_print_metamask(decrypted_data)
+
+
+def prepare_hashcat_command(hashfile: Path, dict_dir: Path) -> None:
+    # Execute the prepare-hashcat sub-command
+    logging.info(
+        f"Preparing hashcat with hashfile: {hashfile}, dictionary directory: {dict_dir}"
+    )
+
+    vault = extract_metamask_vault()
+    generate_metamask_hash(vault_dict=vault, hashfile_path=hashfile)
+
+    repo_path = Path(__file__).resolve().parent.parent
+    hashcat_repo_path = repo_path / "hashcat"
+    dictionary_path = dict_dir / "plain_pass_*"
+
+    # Linux or macOS
+    bash_path = repo_path / "run_hashcat.sh"
+    execute_path = hashcat_repo_path / "hashcat"
+    bash_script = f"{execute_path} -m 26600 --self-test-disable {hashfile.resolve()} {dictionary_path.resolve()}\n"
+    bash_path.write_text(bash_script)
+    logging.info(f"Generated bash script at {bash_path}")
+
+    # Windows
+    bat_path = repo_path / "run_hashcat.bat"
+    bat_script = (
+        "@echo off\n"
+        f'pushd "{hashcat_repo_path.resolve()}"\n'
+        f"hashcat.exe -m 26600 --self-test-disable {hashfile.resolve()} {dictionary_path.resolve()}\n"
+        "popd\n"
+    )
+    bat_path.write_text(bat_script)
+    logging.info(f"Generated batch script at {bat_path}")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Test your Metamask's security if a hacker invades your computer"
+    )
+    subparsers = parser.add_subparsers(dest="command", help="Available sub-commands")
 
     # sub-command: generate-dict
-    parser_generate = subparsers.add_parser("generate-dict", help="generate dictionary")
+    parser_generate = subparsers.add_parser("generate-dict", help="Generate dictionary")
     parser_generate.add_argument(
-        "directory", type=str, help="directory to generate dictionary"
+        "directory", type=str, help="Directory to generate dictionary"
     )
     parser_generate.add_argument(
         "--chrome-pass",
         action="store_true",
-        help="include chrome passwords in dictionary",
+        help="Include Chrome passwords in dictionary",
     )
 
     # sub-command: chrome-password
-    parser_chrome = subparsers.add_parser(
-        "chrome-password", help="print chrome password"
-    )
+    subparsers.add_parser("chrome-password", help="Print Chrome password")
 
     # sub-command: decrypt-metamask
     parser_metamask = subparsers.add_parser(
-        "decrypt-metamask", help="decrypt metamask wallet"
+        "decrypt-metamask", help="Decrypt Metamask wallet"
     )
     parser_metamask.add_argument(
-        "password", type=str, help="password to decrypt metamask wallet"
+        "password", type=str, help="Password to decrypt Metamask wallet"
     )
 
-    # sub-command: hashfile
+    # sub-command: prepare-hashcat
     parser_hashcat = subparsers.add_parser(
-        "prepare-hashcat", help="generate hashfile and init dictionary directory"
+        "prepare-hashcat", help="Generate hashfile and init dictionary directory"
     )
-    parser_hashcat.add_argument("hashfile", type=str, help="hash file path to write")
-    parser_hashcat.add_argument("dict_dir", type=str, help="dictionary directory path")
+    parser_hashcat.add_argument("hashfile", type=str, help="Hash file path to write")
+    parser_hashcat.add_argument("dict_dir", type=str, help="Dictionary directory path")
 
     args = parser.parse_args()
 
-    if args.command is None:
-        parser.print_help()
-    elif args.command == "generate-dict":
-        directory = args.directory
-        add_chrome_pass = args.chrome_pass
-        generate_dict(directory, add_chrome_pass)
-    elif args.command == "chrome-password":
-        login_infos = hack_chrome_login_info()
-        beauty_print_chrome(login_infos)
-    elif args.command == "decrypt-metamask":
-        decrypted_data = hack_metamask(args.password)
-        beauty_print_metamask(decrypted_data)
-    elif args.command == "prepare-hashcat":
-        hashfile_path = Path(args.hashfile)
-        dict_dir = Path(args.dict_dir)
-
-        dictionarys_path = dict_dir / "plain_pass_*"
-        vault = extract_metamask_vault()
-        generate_metamask_hash(vault_dict=vault, hashfile_path=hashfile_path)
-        repo_path = Path(__file__).parent.parent
-        hashcat_repo_path = repo_path / "hashcat"
-
-        # linux or mac
-        bash_path = repo_path / "run_hashcat.sh"
-        exexute_path = hashcat_repo_path / "hashcat"
-        with open(bash_path, "w") as bash_file:
-            bash_file.write(
-                f"{exexute_path} -m 26600 --self-test-disable {hashfile_path.resolve()} {dictionarys_path.resolve()}\n"
+    try:
+        if args.command == "generate-dict":
+            generate_dict_command(
+                directory=Path(args.directory), chrome_pass=args.chrome_pass
             )
-
-        # windows
-        bat_path = repo_path / "run_hashcat.bat"
-
-        with open(bat_path, "w") as bat_file:
-            bat_file.write("@echo off\n")
-            bat_file.write(f'pushd "{hashcat_repo_path}"\n')
-            bat_file.write(
-                f"hashcat.exe -m 26600 --self-test-disable {hashfile_path.resolve()} {dictionarys_path.resolve()}\n"
+        elif args.command == "chrome-password":
+            chrome_password_command()
+        elif args.command == "decrypt-metamask":
+            decrypt_metamask_command(password=args.password)
+        elif args.command == "prepare-hashcat":
+            prepare_hashcat_command(
+                hashfile=Path(args.hashfile), dict_dir=Path(args.dict_dir)
             )
-            bat_file.write("popd\n")
+        else:
+            parser.print_help()
+    except Exception as e:
+        logging.error(f"An error occurred: {e}", exc_info=True)
 
 
 if __name__ == "__main__":
