@@ -46,7 +46,6 @@ poetry install
   - macOS: Run `./hashcat/hashcat -b` to benchmark.
   - Windows: Navigate to the `hashcat` folder and run `hashcat.exe -b`. If you see driver errors, please update your graphics drivers.
 
----
 
 ## Usage
 
@@ -178,8 +177,7 @@ If a password is found, the status shows `Cracked`, and you’ll see output like
 
 6. [BreachCompilation](https://github.com/p4wnsolo/breach-torrents)  
    Released by an anonymous user on Torrents in 2017, containing data from various known breaches (LinkedIn, MySpace, Adobe, Dropbox, etc.).  
-   `magnet:?xt=urn:btih:7ffbcd8cee06aba2ce6561688cf68ce2addca0a3&dn=BreachCompilation&tr=udp%3A%2F%2Ftracker.openbittorrent.com%3A80...`  
-   `magnet:?xt=urn:btih:7FFBCD8CEE06ABA2CE6561688CF68CE2ADDCA0A3&dn=BreachCompilation`
+   `magnet:?xt=urn:btih:7ffbcd8cee06aba2ce6561688cf68ce2addca0a3&dn=BreachCompilation&tr=udp%3A%2F%2Ftracker.openbittorrent.com%3A80&tr=udp%3A%2F%2Ftracker.leechers-paradise.org%3A6969&tr=udp%3A%2F%2Ftracker.coppersurfer.tk%3A6969&tr=udp%3A%2F%2Fglotorrents.pw%3A6969&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337`, `magnet:?xt=urn:btih:7FFBCD8CEE06ABA2CE6561688CF68CE2ADDCA0A3&dn=BreachCompilation`
 
 > All the above dictionaries come from publicly available sources and are intended for research purposes only.
 

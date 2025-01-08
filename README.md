@@ -45,7 +45,7 @@ poetry install
 
 ## 使用方法
 
-> 🚨 MacOS 用户注意，通过 security 命令从 Keychain 获取密码可能被安全监控。*不要*再工作电脑上运行。
+> 🚨 MacOS 用户注意，通过 security 命令从 Keychain 获取密码可能被安全监控。*不要*在工作电脑上运行。
 
 进入虚拟环境
 
