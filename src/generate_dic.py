@@ -7,7 +7,7 @@ from pathlib import Path
 from tqdm import tqdm
 
 from src.hack_chrome_password import hack_chrome_login_info
-from src.utils import extract_file, get_files_in_dir, is_subpath
+from src.utils import extract_file, get_files_in_dir, is_subpath, repo_path
 
 
 def extract_files_in_directory(directory: Path, is_delete: bool = False):
@@ -43,12 +43,12 @@ def extract_files_in_directory(directory: Path, is_delete: bool = False):
     logging.info("All compressed files have been processed")
 
 
-def split_pass(dir: str, is_delete: bool = False):
+def split_pass(dir: Path, is_delete: bool = False):
     """
-    遍历目录下的所有 .txt 文件，提取密码并保存到新的文件中。
-    显示处理进度。
-    :param dir: 目标文件夹路径
-    :param is_delete: 是否删除原文件，默认为 False
+    Traverse all .txt files in the directory, extract passwords, and save them to a new file.
+    Display the progress of the process.
+    :param dir: The path to the target folder
+    :param is_delete: Whether to delete the original file, default is False
     """
     if not os.path.isdir(dir):
         logging.info(f"no directory for password splitting: {dir}")
@@ -120,20 +120,21 @@ def split_pass(dir: str, is_delete: bool = False):
     logging.info("Password separation completed")
 
 
-def chrome_pass_to_txt(dir: str):
+def chrome_pass_to_txt(dir: Path):
     login_infos = hack_chrome_login_info()
     passwords = [info.password + "\n" for info in login_infos]
-    with open(os.path.join(dir, "chrome_pass.txt"), "w", encoding="utf-8") as f:
-        f.writelines(passwords)
+    file_path = dir / "chrome_pass.txt"
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    file_path.write_text("".join(passwords), encoding="utf-8")
 
 
-def flatten_pass(dir: str, size: int = 512, is_delete: bool = False):
+def flatten_pass(dir: Path, size: int = 512, is_delete: bool = False):
     """
-    递归读取目录下所有以 `only_pass.txt` 结尾的文件，并合并为多个文件。
-    :param dir: 目标目录
-    :param size: 每个合并文件的最大大小（单位：MB），默认 1024MB
+    Recursively read all files ending with `only_pass.txt` in the directory and merge them into multiple files.
+    :param dir: Target directory
+    :param size: Maximum size of each merged file (in MB), default is 512MB
     """
-    # 转换为字节
+
     max_size = size * 1024 * 1024
     buffer = []
     output_file_index = 1
@@ -143,25 +144,24 @@ def flatten_pass(dir: str, size: int = 512, is_delete: bool = False):
 
     def write_lines_to_file():
         nonlocal output_file_index, buffer, buffer_size
-        output_file_path = os.path.join(dir, f"plain_pass_{output_file_index}.txt")
-        with open(output_file_path, "w", encoding="utf-8") as f:
-            f.writelines(buffer)
+        output_file_path = dir / f"plain_pass_{output_file_index}.txt"
+        output_file_path.write_text("".join(buffer), encoding="utf-8")
 
         output_file_index += 1
-        buffer = []  # 清空缓冲区
+        buffer = []
         buffer_size = 0
         logging.info(f"Write complete: {output_file_path}")
 
-    # 检查目录下是否只有 plain_pass_*.txt 文件
-    all_files = os.listdir(dir)
+    # Check if the directory contains only plain_pass_*.txt files
+    all_files = list(dir.iterdir())
     if all(
-        f.startswith("plain_pass_") and f.endswith(".txt")
+        f.name.startswith("plain_pass_") and f.name.endswith(".txt")
         for f in all_files
-        if not f.startswith(".")
+        if not f.name.startswith(".")
     ):
         logging.info("only plain_pass_*.txt files exist, skip flatten")
         return
-    # 删除之前生成的合并文件
+    # Delete previously merged files
     files_delete = get_files_in_dir(dir, prefix="plain_pass_", suffix=".txt")
     for file in files_delete:
         os.remove(file)
@@ -208,7 +208,7 @@ def generate_dict(directory: Path, add_chrome_pass: bool = False):
 
     need_to_split = directory / "need_to_split"
     if not os.path.isdir(need_to_split):
-        need_to_split = ""
+        need_to_split = None
 
     if add_chrome_pass:
         chrome_pass_to_txt(directory)
@@ -228,7 +228,9 @@ def generate_dict(directory: Path, add_chrome_pass: bool = False):
         file_name.rename(new_name)
 
     # Then process the files that need password separation
-    split_pass(need_to_split, is_delete=True)
+    if need_to_split:
+        assert isinstance(need_to_split, Path)
+        split_pass(need_to_split, is_delete=True)
 
     # Only process files ending with only_pass.txt
     flatten_pass(directory, is_delete=True)
@@ -239,6 +241,5 @@ def generate_dict(directory: Path, add_chrome_pass: bool = False):
 
 
 if __name__ == "__main__":
-    # 指定目录
-    directory = "/Users/mike/projects/hack-chrome-password/output/dictionary"
+    directory = repo_path / "output/dictionary"
     generate_dict(directory, add_chrome_pass=True)

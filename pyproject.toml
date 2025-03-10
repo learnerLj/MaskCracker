@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "hackChromePassword"
+name = "MaskCracker"
 version = "0.1.0"
 description = ""
 authors = ["Jiahao Luo <luoshitou9@gmail.com>"]

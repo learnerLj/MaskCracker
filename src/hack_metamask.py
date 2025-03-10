@@ -1,5 +1,6 @@
 import glob
 import json
+import logging
 import platform
 import re
 import shutil
@@ -105,15 +106,15 @@ def parse_vault_data(data: str):
     return vaults[0]
 
 
-def check_vault_fileds(vault: dict) -> tuple[bytes, bytes, bytes, int]:
+def check_vault_fileds(vault: dict) -> tuple[str, str, str, int]:
     required_keys = ["data", "iv", "salt", "keyMetadata"]
     for key in required_keys:
         if key not in vault:
             raise KeyError(f"Missing required field: {key}")
 
-    encrypted_data = b64decode(vault["data"])
-    iv = b64decode(vault["iv"])
-    salt = b64decode(vault["salt"])
+    encrypted_data = vault["data"]
+    iv = vault["iv"]
+    salt = vault["salt"]
     iterations = vault["keyMetadata"]["params"]["iterations"]
 
     return encrypted_data, iv, salt, iterations
@@ -121,7 +122,9 @@ def check_vault_fileds(vault: dict) -> tuple[bytes, bytes, bytes, int]:
 
 def decrypt_metamask_vault(vault_dict: dict, password: str) -> list[dict]:
     encrypted_data, iv, salt, iterations = check_vault_fileds(vault_dict)
-
+    salt = b64decode(salt)
+    iv = b64decode(iv)
+    encrypted_data = b64decode(encrypted_data)
     key = PBKDF2(password, salt, dkLen=32, count=iterations, hmac_hash_module=SHA256)
 
     # The tag is passed along with the data and is the last 16 bytes of the data

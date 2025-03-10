@@ -118,3 +118,6 @@ def is_subpath(path: Path, directory: Path) -> bool:
         return directory_resolved in path_resolved.parents
     except ValueError:
         return False
+
+
+repo_path = Path(__file__).parent.parent

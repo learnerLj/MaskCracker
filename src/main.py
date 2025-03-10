@@ -1,6 +1,9 @@
 import argparse
 import logging
 from pathlib import Path
+import sys
+
+sys.path.append(Path(__file__).parents[1].as_posix())
 
 from src.generate_dic import generate_dict
 from src.hack_chrome_password import beauty_print_chrome, hack_chrome_login_info
