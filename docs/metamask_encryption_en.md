@@ -25,7 +25,7 @@ from base64 import b64decode
 
 # MetaMask derives encryption key from user password
 salt = b64decode(vault["salt"])
-password = "user_password"  # For demonstration only, should be obtained securely
+password = "your_secure_password"  # ⚠️ For demonstration only! Should be obtained securely, never use weak passwords
 iterations = 600000  # Current iteration count used by MetaMask
 
 # Derive 32-byte encryption key
@@ -406,8 +406,10 @@ class KeyManager:
     
     def _sign_with_key(self, key: str, data: dict) -> str:
         """Sign with private key (implement based on specific blockchain)"""
-        # Example: For Ethereum signing, use web3.py
-        raise NotImplementedError("Implement specific signing logic")
+        # Ethereum example: from web3 import Web3; w3.eth.account.sign_transaction(...)
+        # Bitcoin example: from bitcoin import ecdsa_sign
+        # Solana example: from solana.keypair import Keypair
+        raise NotImplementedError("Implement signing logic for target blockchain, see libraries above")
     
     def _hash_transaction(self, tx_data: dict) -> str:
         """Calculate transaction hash (implement based on specific blockchain)"""

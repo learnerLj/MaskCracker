@@ -25,7 +25,7 @@ from base64 import b64decode
 
 # MetaMask 从用户密码派生加密密钥
 salt = b64decode(vault["salt"])
-password = "用户设置的密码"  # 仅用于演示，实际应从安全渠道获取
+password = "your_secure_password"  # ⚠️ 仅用于演示！实际应从安全渠道获取，切勿使用弱密码
 iterations = 600000  # MetaMask 当前使用的迭代次数
 
 # 派生出 32 字节的加密密钥
@@ -406,8 +406,10 @@ class KeyManager:
     
     def _sign_with_key(self, key: str, data: dict) -> str:
         """使用私钥签名（需要根据具体区块链实现）"""
-        # 示例：以太坊签名可使用 web3.py
-        raise NotImplementedError("需要实现具体的签名逻辑")
+        # 以太坊示例：from web3 import Web3; w3.eth.account.sign_transaction(...)
+        # 比特币示例：from bitcoin import ecdsa_sign
+        # Solana示例：from solana.keypair import Keypair
+        raise NotImplementedError("需要根据目标区块链实现签名逻辑，参考上述库")
     
     def _hash_transaction(self, tx_data: dict) -> str:
         """计算交易哈希（需要根据具体区块链实现）"""
