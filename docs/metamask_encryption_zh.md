@@ -352,9 +352,12 @@ schedule.every(30).days.do(rotate_private_key)
 #### 实施最小权限原则
 
 ```python
+import time
+
 class KeyManager:
     """
     私钥管理器，实施访问控制
+    注意：这是概念性示例，实际使用需要完整实现所有辅助函数
     """
     def __init__(self, audit_logger):
         self._private_key = None
@@ -371,13 +374,13 @@ class KeyManager:
             'action': 'key_access',
             'requester': requester,
             'timestamp': time.time(),
-            'ip': get_client_ip()
+            'ip': self._get_client_ip()  # 需要实现：获取客户端 IP
         })
         
         # 检查访问次数
         self._access_count += 1
         if self._access_count > self._max_access:
-            raise SecurityError("密钥访问次数超限，可能存在泄漏")
+            raise RuntimeError("密钥访问次数超限，可能存在泄漏")
         
         return self._private_key
     
@@ -386,15 +389,31 @@ class KeyManager:
         签名交易（不暴露私钥）
         """
         # 在内部使用私钥签名，不返回私钥本身
-        signature = sign_with_key(self._private_key, tx_data)
+        signature = self._sign_with_key(self._private_key, tx_data)  # 需要实现：签名函数
         
         self._logger.log({
             'action': 'transaction_signed',
-            'tx_hash': hash_transaction(tx_data),
+            'tx_hash': self._hash_transaction(tx_data),  # 需要实现：哈希函数
             'timestamp': time.time()
         })
         
         return signature
+    
+    def _get_client_ip(self) -> str:
+        """获取客户端 IP（需要根据实际环境实现）"""
+        import socket
+        return socket.gethostbyname(socket.gethostname())
+    
+    def _sign_with_key(self, key: str, data: dict) -> str:
+        """使用私钥签名（需要根据具体区块链实现）"""
+        # 示例：以太坊签名可使用 web3.py
+        raise NotImplementedError("需要实现具体的签名逻辑")
+    
+    def _hash_transaction(self, tx_data: dict) -> str:
+        """计算交易哈希（需要根据具体区块链实现）"""
+        import hashlib
+        import json
+        return hashlib.sha256(json.dumps(tx_data, sort_keys=True).encode()).hexdigest()
 ```
 
 ### 2.6 内存安全
@@ -402,27 +421,58 @@ class KeyManager:
 私钥在内存中的安全同样重要：
 
 ```python
-import ctypes
-import sys
+# 注意：Python 字符串是不可变的，无法完全从内存中擦除
+# 最佳实践是使用 bytes 对象并尽快删除引用
 
-def secure_delete_from_memory(variable):
+def secure_handle_private_key():
     """
-    安全地从内存中删除敏感数据
+    安全处理私钥的示例
     """
-    # 覆盖内存
-    if isinstance(variable, str):
-        buffer = ctypes.create_string_buffer(len(variable))
-        ctypes.memset(ctypes.addressof(buffer), 0, len(variable))
+    # 使用 bytes 而不是 str
+    private_key_bytes = get_decrypted_key_as_bytes()
     
-    # 删除引用
-    del variable
+    try:
+        # 使用私钥进行必要操作
+        result = sign_transaction(private_key_bytes)
+        return result
+    finally:
+        # 尝试覆盖内存（Python 中效果有限）
+        if isinstance(private_key_bytes, bytearray):
+            for i in range(len(private_key_bytes)):
+                private_key_bytes[i] = 0
+        
+        # 删除引用，让垃圾回收器处理
+        del private_key_bytes
+
+# 更好的做法：使用上下文管理器
+class SecureKey:
+    """
+    安全密钥上下文管理器
+    """
+    def __init__(self, key_bytes: bytearray):
+        self.key = key_bytes
+    
+    def __enter__(self):
+        return self.key
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        # 清零内存
+        for i in range(len(self.key)):
+            self.key[i] = 0
+        del self.key
 
 # 使用示例
-private_key = get_decrypted_key()
-# ... 使用私钥 ...
-# 使用完毕后立即删除
-secure_delete_from_memory(private_key)
+with SecureKey(get_key_as_bytearray()) as key:
+    # 使用密钥
+    sign_transaction(key)
+# 离开作用域后自动清理
 ```
+
+**重要提示**：
+- Python 的内存管理机制使得完全擦除内存中的敏感数据很困难
+- 字符串（str）是不可变的，无法直接修改
+- 使用 `bytearray` 可以提供更好的控制
+- 考虑使用专门的密钥管理库，如 `cryptography` 或硬件安全模块
 
 ### 2.7 错误处理和日志
 

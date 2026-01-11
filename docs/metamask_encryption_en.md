@@ -352,9 +352,12 @@ schedule.every(30).days.do(rotate_private_key)
 #### Implement Principle of Least Privilege
 
 ```python
+import time
+
 class KeyManager:
     """
     Key manager implementing access control
+    Note: This is a conceptual example. Actual use requires full implementation of all helper functions.
     """
     def __init__(self, audit_logger):
         self._private_key = None
@@ -371,13 +374,13 @@ class KeyManager:
             'action': 'key_access',
             'requester': requester,
             'timestamp': time.time(),
-            'ip': get_client_ip()
+            'ip': self._get_client_ip()  # To be implemented: get client IP
         })
         
         # Check access count
         self._access_count += 1
         if self._access_count > self._max_access:
-            raise SecurityError("Key access limit exceeded, possible leak")
+            raise RuntimeError("Key access limit exceeded, possible leak")
         
         return self._private_key
     
@@ -386,15 +389,31 @@ class KeyManager:
         Sign transaction (without exposing private key)
         """
         # Use private key internally for signing, don't return the key itself
-        signature = sign_with_key(self._private_key, tx_data)
+        signature = self._sign_with_key(self._private_key, tx_data)  # To be implemented: signing function
         
         self._logger.log({
             'action': 'transaction_signed',
-            'tx_hash': hash_transaction(tx_data),
+            'tx_hash': self._hash_transaction(tx_data),  # To be implemented: hash function
             'timestamp': time.time()
         })
         
         return signature
+    
+    def _get_client_ip(self) -> str:
+        """Get client IP (implement based on actual environment)"""
+        import socket
+        return socket.gethostbyname(socket.gethostname())
+    
+    def _sign_with_key(self, key: str, data: dict) -> str:
+        """Sign with private key (implement based on specific blockchain)"""
+        # Example: For Ethereum signing, use web3.py
+        raise NotImplementedError("Implement specific signing logic")
+    
+    def _hash_transaction(self, tx_data: dict) -> str:
+        """Calculate transaction hash (implement based on specific blockchain)"""
+        import hashlib
+        import json
+        return hashlib.sha256(json.dumps(tx_data, sort_keys=True).encode()).hexdigest()
 ```
 
 ### 2.6 Memory Security
@@ -402,27 +421,58 @@ class KeyManager:
 Security of private keys in memory is equally important:
 
 ```python
-import ctypes
-import sys
+# Note: Python strings are immutable and cannot be completely erased from memory
+# Best practice is to use bytes objects and delete references as soon as possible
 
-def secure_delete_from_memory(variable):
+def secure_handle_private_key():
     """
-    Securely delete sensitive data from memory
+    Example of secure private key handling
     """
-    # Overwrite memory
-    if isinstance(variable, str):
-        buffer = ctypes.create_string_buffer(len(variable))
-        ctypes.memset(ctypes.addressof(buffer), 0, len(variable))
+    # Use bytes instead of str
+    private_key_bytes = get_decrypted_key_as_bytes()
     
-    # Delete reference
-    del variable
+    try:
+        # Perform necessary operations with the private key
+        result = sign_transaction(private_key_bytes)
+        return result
+    finally:
+        # Attempt to overwrite memory (limited effectiveness in Python)
+        if isinstance(private_key_bytes, bytearray):
+            for i in range(len(private_key_bytes)):
+                private_key_bytes[i] = 0
+        
+        # Delete reference, let garbage collector handle it
+        del private_key_bytes
+
+# Better approach: Use context manager
+class SecureKey:
+    """
+    Secure key context manager
+    """
+    def __init__(self, key_bytes: bytearray):
+        self.key = key_bytes
+    
+    def __enter__(self):
+        return self.key
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        # Zero out memory
+        for i in range(len(self.key)):
+            self.key[i] = 0
+        del self.key
 
 # Usage example
-private_key = get_decrypted_key()
-# ... use private key ...
-# Delete immediately after use
-secure_delete_from_memory(private_key)
+with SecureKey(get_key_as_bytearray()) as key:
+    # Use the key
+    sign_transaction(key)
+# Automatically cleaned up when leaving scope
 ```
+
+**Important Notes**:
+- Python's memory management makes it difficult to completely erase sensitive data from memory
+- Strings (str) are immutable and cannot be directly modified
+- Using `bytearray` provides better control
+- Consider using specialized key management libraries like `cryptography` or hardware security modules
 
 ### 2.7 Error Handling and Logging
 
