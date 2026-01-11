@@ -25,7 +25,7 @@ from base64 import b64decode
 
 # MetaMask derives encryption key from user password
 salt = b64decode(vault["salt"])
-password = "user_password"
+password = "user_password"  # For demonstration only, should be obtained securely
 iterations = 600000  # Current iteration count used by MetaMask
 
 # Derive 32-byte encryption key
@@ -276,12 +276,14 @@ config/secrets/
 ```python
 import boto3
 import base64
+import os
 
 def get_private_key_from_kms():
     """
     Retrieve and decrypt private key from AWS KMS
     """
-    kms_client = boto3.client('kms', region_name='us-east-1')
+    # Get region configuration from environment variable
+    kms_client = boto3.client('kms', region_name=os.getenv('AWS_REGION', 'us-east-1'))
     
     # Encrypted private key stored in KMS
     encrypted_key = os.getenv('ENCRYPTED_PRIVATE_KEY')
@@ -289,7 +291,7 @@ def get_private_key_from_kms():
     # Decrypt using KMS
     response = kms_client.decrypt(
         CiphertextBlob=base64.b64decode(encrypted_key),
-        KeyId='arn:aws:kms:region:account:key/key-id'
+        KeyId=os.getenv('KMS_KEY_ID')  # Get KMS key ID from environment variable
     )
     
     return response['Plaintext'].decode()

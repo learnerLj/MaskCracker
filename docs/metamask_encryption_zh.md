@@ -25,7 +25,7 @@ from base64 import b64decode
 
 # MetaMask 从用户密码派生加密密钥
 salt = b64decode(vault["salt"])
-password = "用户设置的密码"
+password = "用户设置的密码"  # 仅用于演示，实际应从安全渠道获取
 iterations = 600000  # MetaMask 当前使用的迭代次数
 
 # 派生出 32 字节的加密密钥
@@ -276,12 +276,14 @@ config/secrets/
 ```python
 import boto3
 import base64
+import os
 
 def get_private_key_from_kms():
     """
     从 AWS KMS 获取并解密私钥
     """
-    kms_client = boto3.client('kms', region_name='us-east-1')
+    # 从环境变量获取区域配置
+    kms_client = boto3.client('kms', region_name=os.getenv('AWS_REGION', 'us-east-1'))
     
     # 存储在 KMS 中的加密私钥
     encrypted_key = os.getenv('ENCRYPTED_PRIVATE_KEY')
@@ -289,7 +291,7 @@ def get_private_key_from_kms():
     # 使用 KMS 解密
     response = kms_client.decrypt(
         CiphertextBlob=base64.b64decode(encrypted_key),
-        KeyId='arn:aws:kms:region:account:key/key-id'
+        KeyId=os.getenv('KMS_KEY_ID')  # 从环境变量获取 KMS 密钥 ID
     )
     
     return response['Plaintext'].decode()
