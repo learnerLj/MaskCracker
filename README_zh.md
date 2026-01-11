@@ -159,7 +159,9 @@ Progress：当前进度，尝试过的密码数
 > 以上密码库均来自于公开渠道，仅供研究使用。
 
 ## 原理解读
-博客 doing...
+
+详细的 MetaMask 加密机制和私钥管理最佳实践，请参阅：
+- [MetaMask 加密机制详解与 Bot 脚本私钥管理指南](./docs/metamask_encryption_zh.md)
 
 ## TODO
 

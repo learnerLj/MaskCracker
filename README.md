@@ -170,7 +170,9 @@ The following password library has not been tested:
 > All password libraries are from public sources and are for research purposes only.
 
 ## Technical Explanation
-Blog post coming soon...
+
+For detailed information about MetaMask's encryption mechanism and best practices for private key management in bot scripts, please refer to:
+- [MetaMask Encryption Mechanism and Private Key Management Guide](./docs/metamask_encryption_en.md)
 
 ## Roadmap
 
